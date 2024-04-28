@@ -1,0 +1,77 @@
+import win.ui;
+import web.view;
+/*DSG{{*/
+var winform = win.form(text="扫码登录";right=759;bottom=469)
+winform.add()
+/*}}*/
+
+var getCookiesArray = function(webView){
+	var result = webView.cdp("Network.getCookies");
+	var cookies = result.cookies;
+	return cookies
+}
+
+var getCookiesString = function(){
+	var cookies = getCookiesArray();
+	var cookiesStrArray = {};
+	for(i=1;#cookies;1){
+		var cookie = cookies[i];
+		table.push(cookiesStrArray, cookie.name +"="+ cookie.value);
+	}
+	var cookiesStr = string.join(cookiesStrArray,"; ")
+	return cookiesStr;
+}
+
+var doJavasciptCode = function(webView, code){
+	var jscode = "(function(){"+code+'\n})()';
+	var result;
+	webView.doScript(jscode, function(r){
+		result = r;
+	}
+	)
+	while(!result){
+		win.delay(10);
+	}
+	return result;
+}
+
+var getLoctionHref = function(webView){
+	return doJavasciptCode(webView, "return document.location.href;");
+}
+
+var getWebviewUserAgent = function(webView){
+	return doJavasciptCode(webView, "return navigator.userAgent;");
+}
+
+var main = function(){
+	var webView = web.view(winform); 
+	var url = "https://mp.weixin.qq.com";
+	webView.go(url);
+	..win.delay(1000);
+	var curUrl = getLoctionHref(webView);
+	while(!string.find(curUrl, "@https://mp.weixin.qq.com/cgi-bin/home")){
+		win.delay(500);
+		curUrl = getLoctionHref(webView);
+	}
+	var cookies = getCookiesArray(webView);
+	//string.save("\cookies.json", web.json.stringify(cookies,true))
+	var token = string.match(curUrl, "token=(\d+)");
+	//..console.dump(curUrl);
+	var ua = getWebviewUserAgent(webView)
+	var results = {
+		"ua": ua,
+		"token": token,
+		"cookies": cookies
+	}
+	winform.results = results;
+	win.delay(1500);
+	winform.close();
+}
+
+winform.show();
+
+main();
+
+
+win.loopMessage();
+return winform;

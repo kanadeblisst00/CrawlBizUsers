@@ -1,0 +1,97 @@
+﻿import kirequests;
+import win;
+import kilogging;
+
+class getfanslist{
+	ctor(cookies, ua, token, listview){
+		this.token = token;
+		var headers = {"User-Agent": ua};
+		this.session = ..kirequests.session(headers,,cookies);
+		this.logger = ..kilogging();
+		this.listview = listview;
+	};
+	
+	parseUserList = function(userList){
+		var datas = {};
+		var formDatas = {fields={"user_name","user_openid","user_create_time","user_head_img"}};
+		for i,user in userList{
+			var user_name = ..string.replace(user.user_name,"@,","-");
+			var user_create_time = tostring(..time(user.user_create_time),"%Y-%m-%d %H:%M:%S");
+			var t = {
+				user_name=user_name;
+				user_openid=user.user_openid;
+				user_create_time=user_create_time;
+				user_head_img=user.user_head_img
+			};
+			var line = ..string.join({user_name;user.user_openid;user_create_time;user.user_head_img},",");
+			..table.push(datas, line);
+			..table.push(formDatas, t);
+		}
+		if(this.listview) this.listview.setTable(formDatas);
+		this.writeToCsv(datas);
+	};
+	
+	writeToCsv = function(datas){
+		var path = ..io.localpath("\公众号粉丝.csv");
+		if(!..io.exist(path)){
+			..string.save(path, ..string.fromto('用户昵称,openid,关注时间,用户头像\n'));
+		}
+		var s = ..string.join(datas,'\n') + '\n';
+		..string.save(path,..string.fromto(s),true);
+	};
+	
+	run = function(){
+		var page = 1;
+		var nextUserListPageUrl = "https://mp.weixin.qq.com/cgi-bin/user_tag";
+		this.logger.info("开始采集粉丝列表!");
+		var userList;
+		while(true){
+			var params = {
+				"action": "get_user_list",
+				"groupid": -2,
+				"limit": 20,
+				"offset": 0,
+				"token": this.token,
+				"lang": "zh_CN",
+				"f": "json",
+				"backfoward": 1,
+				"ajax": 1,
+				"random": "0." + ..string.random(16, "0123456789")
+			}
+			if(userList){
+				params["begin_openid"] = userList[#userList]["user_openid"];
+				params["begin_create_time"] = userList[#userList]["user_create_time"];
+			}
+			var resp = this.session.get(nextUserListPageUrl,params);
+			var cgiData = resp.json(); 
+			if(cgiData.base_resp.ret != 0){
+				this.logger.error(cgiData.base_resp.err_msg);
+				return;
+			}
+			userList = cgiData["user_list"];
+			if(!userList){
+				this.logger.info("采集公众号粉丝列表完成！总共"+page+"页");
+				break;
+			}
+			userList = userList["user_info_list"];
+			this.parseUserList(userList);
+			this.logger.info("当前页码(%s)和数据量(%s)", tostring(page), tostring(#userList));
+			if(!#userList || resp.status != 200) {
+				this.logger.warn(cgiData);
+				break;
+			}
+			page += 1;
+			..win.delay(2500);
+		}
+	}
+}
+
+namespace getfanslist{
+	
+}
+
+/**intellisense()
+getfanslist(.(cookies,ua,token) = 采集公众号粉丝列表
+getfanslist() = !getfanslistObj.
+getfanslistObj.run() = 开始采集
+end intellisense**/

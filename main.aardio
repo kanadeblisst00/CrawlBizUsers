@@ -1,0 +1,49 @@
+import win.ui;
+import kilogging;
+/*DSG{{*/
+mainForm = win.form(text="导出粉丝列表";right=757;bottom=467)
+mainForm.add(
+listview={cls="listview";left=16;top=8;right=736;bottom=456;edge=1;z=1}
+)
+/*}}*/
+
+var logTerminal;
+var logLevel;
+
+if(_STUDIO_INVOKED){
+	io.open();
+	logLevel ="DEBUG";
+	logTerminal = kilogging.CONSOLE;
+}else{
+	logLevel = "INFO";
+	logTerminal = kilogging.FILE;
+}
+
+kilogging.config(logLevel,,,logTerminal);
+
+var main = function(){
+	var child,wb = mainForm.loadForm("\dlg\login.aardio");
+	child.doModal(mainForm);
+	var results = child.results;
+	
+	mainForm.listview.insertColumn("用户昵称",100) 
+	mainForm.listview.insertColumn("openid",220) 
+	mainForm.listview.insertColumn("关注时间",120) 
+	mainForm.listview.insertColumn("头像",-1) 
+	
+	mainForm.show();
+	
+	thread.invoke( 
+		function(results, mainForm){
+			import getfanslist;
+			
+			var g = getfanslist(results.cookies,results.ua,results.token, mainForm.listview);
+			g.run();
+		},results,mainForm
+	)
+	
+}
+
+main();
+
+return win.loopMessage();
