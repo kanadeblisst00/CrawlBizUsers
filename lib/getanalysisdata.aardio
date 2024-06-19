@@ -1,0 +1,196 @@
+﻿import kirequests;
+import win;
+import web.json
+import kilogging;
+
+class getanalysisdata{
+	ctor(cookies, ua, token, listview){
+		this.token = token;
+		var headers = {"User-Agent": ua};
+		this.session = ..kirequests.session(headers,,cookies);
+		this.logger = ..kilogging();
+		this.listview = listview;
+	};
+	
+	parsePageList = function(html){
+		var pageDatas = ..table.array();
+		var publish_page_str = ..string.match(html, "publish_page = (\{.*?\});")
+		var publish_page = ..web.json.tryParse(publish_page_str)
+		var publish_list = publish_page["publish_list"]
+		for(i=1;#publish_list;1){
+			var publish_info_str = publish_list[i]["publish_info"];
+			var publish_info_str = ..string.replace(publish_info_str,"@&quot;", '"');
+			var publish_info = ..web.json.tryParse(publish_info_str);
+			var appmsg_info_list = publish_info["appmsg_info"];
+			for(j=1;#appmsg_info_list;1){
+				var appmsg_info = appmsg_info_list[j];
+				if(appmsg_info["is_deleted"]) continue;
+				var send_time = appmsg_info["line_info"]["send_time"];
+				var reward_money = appmsg_info["reward_money"] : 0;
+				var pageData = {
+					appmsgid=appmsg_info["appmsgid"];
+					send_time=send_time;
+					copyright_type=appmsg_info["copyright_type"]; // 是否原创
+					is_pay_subscribe=appmsg_info["is_pay_subscribe"]; // 是否付费
+					content_url=appmsg_info["content_url"];
+					title=appmsg_info["title"];
+					read_num=appmsg_info["read_num"];
+					old_like_num=appmsg_info["old_like_num"];
+					reward_money=reward_money;
+					like_num=appmsg_info["like_num"];
+				}
+				..table.push(pageDatas, pageData);
+			}
+			
+		}
+		return pageDatas;
+	};
+	
+	save = function(datas, keys, path, addItem=false){
+		var path = ..io.localpath(path);
+		if(!..io.exist(path)){
+			..string.save(path, ..string.fromto(..string.join(keys, ",") +'\n'));
+		}
+		var valDatas = ..table.array();
+		for(i=1;#datas;1){
+			var data = datas[i];
+			var t = ..table.map(keys,function(v,k,result){
+				var v = data[v];
+				if(v === null){
+					v = 0;
+				}
+				result[k] = v;
+			})
+			if(this.listview && addItem) this.listview.addItem(t);
+			..table.push(valDatas, ..string.join(t,','));
+		}
+		var s = ..string.join(valDatas,'\n') + '\n';
+		..string.save(path,..string.fromto(s),true);
+	};
+	
+	getAnalysisData = function(pageData){
+		var appmsgid, send_time = pageData.appmsgid, pageData.send_time;
+		var url = "https://mp.weixin.qq.com/misc/appmsganalysis"
+		var publish_date = tostring(..time(send_time),"%Y-%m-%d");
+		if(publish_date < "2023-12-26") return;
+		this.logger.info("开始采集文章(%s, %s)的运营数据!", appmsgid, publish_date);
+		var params = {
+    		"action": "detailpage",
+    		"msgid": appmsgid + "_1",
+    		"publish_date": publish_date,
+    		"type": "int",
+    		"token": this.token,
+    		"lang": "zh_CN"
+		}
+		var resp = this.session.get(url, params);
+		var html = resp.text;
+		html = ..string.replace(html,"@window.wx.cgiData = {};","")
+		var cgiData_str = ..string.match(html,"window.wx.cgiData = (\{.+?\});");
+		var cgiData = ..web.json.tryParse(cgiData_str);
+		var articleData = cgiData["articleData"];
+		var articleSummaryData = cgiData["articleSummaryData"];
+		var article_data_new = articleData["article_data_new"];
+		if(!article_data_new){
+			return ;
+		}
+		var subs_transform = articleData["subs_transform"];
+		var recommend_transform = articleData["recommend_transform"];
+		var analysisData = {
+			title=articleData["title"];
+			msgid=articleData["msgid"];
+			publish_date=articleData["publish_date"];
+			read_pv=article_data_new["read_pv"]; // 阅读数
+			finished_read_pv_ratio=article_data_new["finished_read_pv_ratio"]; // 完成阅读比例
+			avg_article_read_time=article_data_new["avg_article_read_time"]; // 平均阅读停留时间(分钟)
+			follow_after_read_uv=article_data_new["follow_after_read_uv"]; // 阅读后关注人数
+			share_pv=article_data_new["share_pv"]; // 分享数
+			zaikan_cnt=article_data_new["zaikan_cnt"]; // 在看数
+			like_cnt=article_data_new["like_cnt"]; // 点赞数
+			praise_money=article_data_new["praise_money"]; // 赞赏数
+			comment_cnt=article_data_new["comment_cnt"]; // 评论数
+			subscribe_send_uv=subs_transform["send_uv"]; // 订阅送达人数
+			subscribe_read_pv=subs_transform["read_pv"]; // 订阅阅读次数
+			fans_share_pv=subs_transform["fans_share_pv"]; // 粉丝分享次数
+			read_in_share_scene_pv=subs_transform["read_in_share_scene_pv"]; // 分享产生的阅读次数
+			recommend_expose_pv=recommend_transform["expose_pv"]; // 推荐的曝光次数
+			recommend_read_pv=recommend_transform["read_pv"]; // 推荐产生的阅读次数
+			recommend_follow_after_read_uv=recommend_transform["follow_after_read_uv"]; // 推荐阅读后关注人数
+			recommend_expose_read_ratio_raw=recommend_transform["expose_read_ratio_raw"]; // 推荐的阅读转换率
+			recommend_read_follow_ratio_raw=recommend_transform["read_follow_ratio_raw"]; // 推荐的阅读关注率
+		}
+		..win.delay(3000);
+		return analysisData;
+	};
+	
+	run = function(){
+		var offset = 0;
+		var appmsgPublishUrl = "https://mp.weixin.qq.com/cgi-bin/appmsgpublish";
+		this.logger.info("开始采集历史文章运营数据!");
+		while(true){
+			var params = {
+    			"sub": "list",
+    			"begin": offset,
+    			"count": 10,
+    			"token": this.token,
+    			"lang": "zh_CN"
+			}
+			var resp = this.session.get(appmsgPublishUrl,params);
+			var html = resp.text; 
+			if(resp.status != 200){
+				this.logger.error("状态码(%d)错误", resp.status);
+				return;
+			}
+			var pageDatas = this.parsePageList(html);
+			var page = offset/10+1;
+			if(!#pageDatas){
+				this.logger.info("采集公众号粉丝列表完成！总共"+page+"页");
+				break;
+			}
+			this.logger.info("当前页码(%s)和数据量(%s)", tostring(page), tostring(#pageDatas));
+			var analysisDatas = ..table.array();
+			for(i=1;#pageDatas;1){
+				var pageData = pageDatas[i];
+				var analysisData = this.getAnalysisData(pageData);
+				if(analysisData) ..table.push(analysisDatas, analysisData);
+			}
+			this.save(pageDatas, pageDataKeys, "\公众号文章列表数据.csv");
+			this.save(analysisDatas, analysisDataKeys, "\公众号运营数据.csv", true);
+			offset += 10;
+			..win.delay(5000);
+		}
+	}
+}
+
+namespace getanalysisdata{
+	sceneTags = {
+		[0]='公众号消息';
+		[1]='聊天会话';
+		[2]='朋友圈';
+		[3]='朋友在看';
+		[4]='公众号主页';
+		[5]='其它';
+		[6]='推荐';
+		[7]='搜一搜'
+	}
+	
+	pageDataKeys = {
+		"title";"appmsgid";"send_time";"content_url";"copyright_type";
+		"read_num";"old_like_num";"reward_money";"like_num";
+	}
+	
+	analysisDataKeys = {
+		"title";"msgid";"publish_date";"read_pv";"finished_read_pv_ratio";
+		"avg_article_read_time";"follow_after_read_uv";"share_pv";
+		"zaikan_cnt";"like_cnt";"praise_money";"comment_cnt";
+		"subscribe_send_uv";"subscribe_read_pv";"fans_share_pv";
+		"read_in_share_scene_pv";"recommend_expose_pv";"recommend_read_pv";
+		"recommend_follow_after_read_uv";"recommend_expose_read_ratio_raw";
+		"recommend_read_follow_ratio_raw";
+	};
+}
+
+/**intellisense()
+getanalysisdata(.(cookies,ua,token) = 采集公众号粉丝列表
+getanalysisdata() = !getanalysisdataObj.
+getanalysisdataObj.run() = 开始采集
+end intellisense**/

@@ -21,11 +21,12 @@ if(_STUDIO_INVOKED){
 
 kilogging.config(logLevel,,,logTerminal);
 
-var main = function(){
+var getFansList = function(){
 	var child,wb = mainForm.loadForm("\dlg\login.aardio");
 	child.doModal(mainForm);
 	var results = child.results;
 	
+	mainForm.text = "导出粉丝列表";
 	mainForm.listview.insertColumn("用户昵称",100) 
 	mainForm.listview.insertColumn("openid",220) 
 	mainForm.listview.insertColumn("关注时间",120) 
@@ -40,10 +41,40 @@ var main = function(){
 			var g = getfanslist(results.cookies,results.ua,results.token, mainForm.listview);
 			g.run();
 		},results,mainForm
-	)
-	
+	)	
 }
 
-main();
+var getAnalysisData = function(){
+	var child,wb = mainForm.loadForm("\dlg\login.aardio");
+	child.doModal(mainForm);
+	var results = child.results;
+	
+	mainForm.text = "获取运营数据";
+	mainForm.listview.insertColumn("标题", 80) 
+	mainForm.listview.insertColumn("msgid", 80) 
+	mainForm.listview.insertColumn("发布时间", 80) 
+	mainForm.listview.insertColumn("阅读", 50) 
+	mainForm.listview.insertColumn("完读率", 80) 
+	mainForm.listview.insertColumn("平均停留时间", 40) 
+	mainForm.listview.insertColumn("阅读数后关注", 40) 
+	mainForm.listview.insertColumn("分享", 40) 
+	mainForm.listview.insertColumn("在看", 40) 
+	mainForm.listview.insertColumn("点赞", 40) 
+	mainForm.listview.insertColumn("赞赏", 40) 
+	mainForm.listview.insertColumn("留言", 40) 
+	mainForm.show();
+	
+	thread.invoke( 
+		function(results, mainForm){
+			import getanalysisdata;
+			
+			var g = getanalysisdata(results.cookies,results.ua,results.token, mainForm.listview);
+			g.run();
+		},results,mainForm
+	)	
+}
+
+
+getAnalysisData();
 
 return win.loopMessage();
